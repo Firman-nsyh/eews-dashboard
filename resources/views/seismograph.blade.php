@@ -1,349 +1,141 @@
 @extends('layouts.app')
-
 @section('title', 'Seismograf Real-Time')
 
 @section('content')
-<div class="space-y-6">
-    {{-- Full Screen Seismograph --}}
-    <div class="glass-panel rounded-xl p-6">
-        <div class="flex justify-between items-center mb-6">
-            <div>
-                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
-                    <i class="fa-solid fa-wave-square text-seismo-accent animate-pulse"></i>
-                    Seismograf Real-Time
-                </h2>
-                <p class="text-slate-400 text-sm mt-1">Visualisasi data akselerometer MPU6050 (X, Y, Z) & STA/LTA Ratio</p>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="w-3 h-3 bg-seismo-accent rounded-full animate-pulse"></span>
-                    <span class="text-seismo-accent font-mono">LIVE STREAM</span>
-                </div>
-                <button onclick="togglePause()" id="pause-btn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors">
-                    <i class="fa-solid fa-pause mr-1"></i> Pause
-                </button>
-            </div>
-        </div>
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-wave-square text-cyan"></i> Seismograf Real-Time</h2>
+        <div class="text-sm text-slate mt-1">Visualisasi data akselerometer MPU6050 (Deviasi) & STA/LTA Ratio</div>
+    </div>
+    <div class="badge badge-aman"><i class="fa-solid fa-circle-dot" style="animation: pulse 1s infinite;"></i> LIVE STREAM</div>
+</div>
 
-        {{-- Main Chart --}}
-        <div class="relative h-96 seismograph-grid rounded-lg border border-slate-700 overflow-hidden bg-slate-900/50">
-            <canvas id="main-seismo"></canvas>
-            
-            {{-- Grid overlay info --}}
-            <div class="absolute top-4 left-4 bg-slate-900/80 rounded-lg p-3 text-xs font-mono space-y-1">
-                <div class="text-seismo-accent">X-Axis (Lateral)</div>
-                <div class="text-warning">Y-Axis (Longitudinal)</div>
-                <div class="text-safe">Z-Axis (Vertical)</div>
-            </div>
-        </div>
-
-        {{-- STA/LTA Ratio Bar --}}
-        <div class="mt-4">
-            <div class="flex justify-between text-sm mb-2">
-                <span class="text-slate-400">STA/LTA Ratio (Trigger Threshold)</span>
-                <span class="font-mono text-seismo-accent" id="sta-lta-value">0.00</span>
-            </div>
-            <div class="h-4 bg-slate-800 rounded-full overflow-hidden relative">
-                <div id="sta-lta-bar" class="h-full bg-gradient-to-r from-safe via-warning to-danger transition-all duration-300" style="width: 0%"></div>
-                <div class="absolute top-0 bottom-0 w-0.5 bg-white" style="left: 75%" title="Trigger Threshold"></div>
-            </div>
-            <div class="flex justify-between text-xs text-slate-500 mt-1">
-                <span>0.0</span>
-                <span>Threshold: 1.5</span>
-                <span>3.0+</span>
-            </div>
-        </div>
+<div class="glass-panel p-6 mb-6">
+    <div class="seismograph-container">
+        <canvas id="liveChart"></canvas>
     </div>
 
-    {{-- 3-Axis Visualization --}}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="glass-panel rounded-xl p-4">
-            <h3 class="text-sm font-medium text-seismo-accent mb-3 flex items-center gap-2">
-                <span class="w-2 h-2 bg-seismo-accent rounded-full"></span>
-                Axis X (Surge/Sway)
-            </h3>
-            <div class="h-32 relative">
-                <canvas id="axis-x-chart"></canvas>
-            </div>
-            <div class="mt-2 text-center">
-                <span class="text-2xl font-mono font-bold text-white" id="axis-x-value">0.00</span>
-                <span class="text-xs text-slate-500">m/s²</span>
-            </div>
+    <div class="stalta-bar-container mt-6">
+        <div class="flex justify-between text-xs font-semibold mb-2">
+            <span class="text-slate">STA/LTA Ratio (Ambang Gempa: 2.0)</span>
+            <span class="text-cyan font-mono" id="stalta-text">0.00</span>
         </div>
-
-        <div class="glass-panel rounded-xl p-4">
-            <h3 class="text-sm font-medium text-warning mb-3 flex items-center gap-2">
-                <span class="w-2 h-2 bg-warning rounded-full"></span>
-                Axis Y (Heave/Sway)
-            </h3>
-            <div class="h-32 relative">
-                <canvas id="axis-y-chart"></canvas>
-            </div>
-            <div class="mt-2 text-center">
-                <span class="text-2xl font-mono font-bold text-white" id="axis-y-value">0.00</span>
-                <span class="text-xs text-slate-500">m/s²</span>
-            </div>
+        <div class="stalta-bar-track">
+            <div class="stalta-bar-fill" id="stalta-fill" style="width: 0%;"></div>
+            <div class="stalta-threshold-line" style="left: 40%; background: #ef4444; width: 3px;"></div>
         </div>
-
-        <div class="glass-panel rounded-xl p-4">
-            <h3 class="text-sm font-medium text-safe mb-3 flex items-center gap-2">
-                <span class="w-2 h-2 bg-safe rounded-full"></span>
-                Axis Z (Vertical)
-            </h3>
-            <div class="h-32 relative">
-                <canvas id="axis-z-chart"></canvas>
-            </div>
-            <div class="mt-2 text-center">
-                <span class="text-2xl font-mono font-bold text-white" id="axis-z-value">0.00</span>
-                <span class="text-xs text-slate-500">m/s²</span>
-            </div>
-        </div>
-    </div>
-
-    {{-- FFT Spectrum (Simulated) --}}
-    <div class="glass-panel rounded-xl p-6">
-        <h3 class="text-lg font-semibold text-white mb-4">Frequency Spectrum (FFT)</h3>
-        <div class="h-48 relative">
-            <canvas id="fft-chart"></canvas>
+        <div class="flex justify-between text-xs text-slate mt-1">
+            <span>0.0</span>
+            <span>Threshold: 2.0</span>
+            <span>5.0+</span>
         </div>
     </div>
 </div>
+@endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let isPaused = false;
-    const maxPoints = 300;
+document.addEventListener('DOMContentLoaded', async function() {
+    const ctx = document.getElementById('liveChart').getContext('2d');
+    const maxDataPoints = 50; 
+
+    // Muat data grafik dari shared memory localStorage
+    let localChartData = JSON.parse(localStorage.getItem('eews_chart_data')) || [];
     
-    function createChart(canvasId, color, fill = false) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        return new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Array(maxPoints).fill(''),
-                datasets: [{
-                    data: Array(maxPoints).fill(0),
-                    borderColor: color,
-                    backgroundColor: fill ? color.replace(')', ', 0.1)').replace('rgb', 'rgba') : 'transparent',
-                    borderWidth: 1.5,
-                    tension: 0.3,
-                    pointRadius: 0,
-                    fill: fill
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { 
-                        display: true,
-                        grid: { color: 'rgba(148, 163, 184, 0.05)' },
-                        ticks: { color: '#64748b', font: { size: 9 } }
-                    }
-                }
-            }
-        });
+    // Konfigurasi awal Chart.js
+    let labels = Array(maxDataPoints).fill('');
+    let dataDeviation = Array(maxDataPoints).fill(0);
+
+    // Isikan data chart yang sempat terekam di tab sebelah
+    if(localChartData.length > 0) {
+        dataDeviation = localChartData.map(d => d.deviation);
+        while(dataDeviation.length < maxDataPoints) dataDeviation.unshift(0);
     }
 
-    const mainChart = new Chart(document.getElementById('main-seismo'), {
+    const liveChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: Array(maxPoints).fill(''),
-            datasets: [
-                {
-                    label: 'X',
-                    data: Array(maxPoints).fill(0),
-                    borderColor: '#06b6d4',
-                    backgroundColor: 'rgba(6, 182, 212, 0.05)',
-                    borderWidth: 1.5,
-                    tension: 0.3,
-                    pointRadius: 0
-                },
-                {
-                    label: 'Y',
-                    data: Array(maxPoints).fill(0),
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.05)',
-                    borderWidth: 1.5,
-                    tension: 0.3,
-                    pointRadius: 0
-                },
-                {
-                    label: 'Z',
-                    data: Array(maxPoints).fill(0),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
-                    borderWidth: 1.5,
-                    tension: 0.3,
-                    pointRadius: 0
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    align: 'end',
-                    labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } }
-                }
-            },
-            scales: {
-                x: { display: false },
-                y: {
-                    grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                    ticks: { color: '#64748b', font: { size: 10 } }
-                }
-            }
-        }
-    });
-
-    const chartX = createChart('axis-x-chart', '#06b6d4', true);
-    const chartY = createChart('axis-y-chart', '#f59e0b', true);
-    const chartZ = createChart('axis-z-chart', '#10b981', true);
-
-    // FFT Chart
-    const fftChart = new Chart(document.getElementById('fft-chart'), {
-        type: 'bar',
-        data: {
-            labels: ['0.5', '1', '2', '3', '5', '7', '10', '15', '20', '30', '50', '100'],
+            labels: labels,
             datasets: [{
-                label: 'Amplitude',
-                data: Array(12).fill(0),
-                backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                label: 'Deviasi Getaran (g)',
+                data: dataDeviation,
                 borderColor: '#06b6d4',
-                borderWidth: 1
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.1,
+                fill: true,
+                backgroundColor: 'rgba(6, 182, 212, 0.1)'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    title: { display: true, text: 'Frequency (Hz)', color: '#64748b' },
-                    ticks: { color: '#64748b' }
-                },
-                y: {
-                    grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                    ticks: { color: '#64748b' }
-                }
-            }
+                y: { min: -0.1, max: 1.5, grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { display: false } }
+            },
+            plugins: { legend: { labels: { color: '#e2e8f0', font: { family: 'JetBrains Mono' } } } }
         }
     });
 
-    function togglePause() {
-        isPaused = !isPaused;
-        document.getElementById('pause-btn').innerHTML = isPaused 
-            ? '<i class="fa-solid fa-play mr-1"></i> Resume' 
-            : '<i class="fa-solid fa-pause mr-1"></i> Pause';
+    function updateStaltaUI(stalta) {
+        document.getElementById('stalta-text').innerText = parseFloat(stalta).toFixed(2);
+        let percentage = Math.min((stalta / 5.0) * 100, 100);
+        const barFill = document.getElementById('stalta-fill');
+        barFill.style.width = percentage + '%';
+        barFill.style.background = stalta >= 2.0 ? '#ef4444' : 'linear-gradient(90deg, #10b981, #f59e0b)';
     }
 
-    function generateEarthquakeSignal(t, magnitude) {
-        const freq1 = 2 + Math.random() * 3;
-        const freq2 = 5 + Math.random() * 5;
-        const decay = Math.exp(-t * 0.5);
-        return magnitude * decay * (
-            Math.sin(t * freq1 * Math.PI * 2) * 0.6 +
-            Math.sin(t * freq2 * Math.PI * 2) * 0.4 +
-            (Math.random() - 0.5) * 0.3
-        );
+    // Tampilkan nilai bar STA/LTA terakhir dari cache
+    if(localChartData.length > 0) {
+        updateStaltaUI(localChartData[localChartData.length - 1].stalta_ratio);
     }
 
-    let earthquakeActive = false;
-    let earthquakeTime = 0;
-    let earthquakeMagnitude = 0;
-
-    function updateData() {
-        if (isPaused) return;
-
-        const now = Date.now() / 1000;
-        
-        // Randomly trigger earthquake (5% chance every second)
-        if (!earthquakeActive && Math.random() < 0.02) {
-            earthquakeActive = true;
-            earthquakeTime = 0;
-            earthquakeMagnitude = 2 + Math.random() * 5; // Magnitude 2-7
+    // Jalur Sinkronisasi Tambahan via API InfluxDB
+    try {
+        const res = await fetch('/api/seismograf/data');
+        const json = await res.json();
+        if (json.success && json.data.length > 0) {
+            dataDeviation = json.data.map(d => parseFloat(d.deviation) || 0);
+            while(dataDeviation.length < maxDataPoints) dataDeviation.unshift(0);
+            liveChart.data.datasets[0].data = dataDeviation;
+            liveChart.update();
+            updateStaltaUI(json.data[json.data.length - 1].stalta_ratio);
         }
+    } catch (err) { console.warn(err); }
 
-        let x, y, z, staLta;
+    // WebSocket Real-Time Listener
+    if (window.Echo) {
+        window.Echo.channel('seismic')
+            .listen('.data.received', (e) => {
+                let devVal = parseFloat(e.deviation) || 0;
+                
+                // 1. Dorong pergerakan grafik
+                liveChart.data.datasets[0].data.push(devVal);
+                if (liveChart.data.datasets[0].data.length > maxDataPoints) {
+                    liveChart.data.datasets[0].data.shift();
+                }
+                liveChart.update('none');
+                updateStaltaUI(e.stalta_ratio);
 
-        if (earthquakeActive) {
-            earthquakeTime += 0.1;
-            x = generateEarthquakeSignal(earthquakeTime, earthquakeMagnitude);
-            y = generateEarthquakeSignal(earthquakeTime + 0.5, earthquakeMagnitude * 0.8);
-            z = 9.8 + generateEarthquakeSignal(earthquakeTime + 1, earthquakeMagnitude * 0.6);
-            staLta = 1.0 + earthquakeMagnitude * 0.3 * Math.exp(-earthquakeTime * 0.3);
-            
-            if (earthquakeTime > 10) {
-                earthquakeActive = false;
-            }
-        } else {
-            x = (Math.random() - 0.5) * 0.05;
-            y = (Math.random() - 0.5) * 0.05;
-            z = 9.8 + (Math.random() - 0.5) * 0.02;
-            staLta = 0.2 + Math.random() * 0.3;
-        }
+                // 2. 🌟 SINKRONISASI SUNTIK MEMORI KE TAB DASHBOARD (Kunci Sukses) 🌟
+                localStorage.setItem('eews_last_telemetry', JSON.stringify(e));
 
-        // Update main chart
-        mainChart.data.datasets[0].data.shift();
-        mainChart.data.datasets[0].data.push(x);
-        mainChart.data.datasets[1].data.shift();
-        mainChart.data.datasets[1].data.push(y);
-        mainChart.data.datasets[2].data.shift();
-        mainChart.data.datasets[2].data.push(z);
-        mainChart.update('none');
+                let sharedChart = JSON.parse(localStorage.getItem('eews_chart_data')) || [];
+                sharedChart.push({ deviation: devVal, stalta_ratio: parseFloat(e.stalta_ratio) || 0 });
+                if (sharedChart.length > 50) sharedChart.shift();
+                localStorage.setItem('eews_chart_data', JSON.stringify(sharedChart));
 
-        // Update individual charts
-        chartX.data.datasets[0].data.shift();
-        chartX.data.datasets[0].data.push(x);
-        chartX.update('none');
-
-        chartY.data.datasets[0].data.shift();
-        chartY.data.datasets[0].data.push(y);
-        chartY.update('none');
-
-        chartZ.data.datasets[0].data.shift();
-        chartZ.data.datasets[0].data.push(z);
-        chartZ.update('none');
-
-        // Update values
-        document.getElementById('axis-x-value').textContent = x.toFixed(3);
-        document.getElementById('axis-y-value').textContent = y.toFixed(3);
-        document.getElementById('axis-z-value').textContent = z.toFixed(3);
-
-        // Update STA/LTA
-        const staLtaPercent = Math.min((staLta / 3.0) * 100, 100);
-        document.getElementById('sta-lta-bar').style.width = staLtaPercent + '%';
-        document.getElementById('sta-lta-value').textContent = staLta.toFixed(2);
-        
-        if (staLta > 1.5) {
-            document.getElementById('sta-lta-bar').classList.add('animate-pulse');
-        } else {
-            document.getElementById('sta-lta-bar').classList.remove('animate-pulse');
-        }
-
-        // Update FFT (simulated)
-        const fftData = fftChart.data.datasets[0].data;
-        for (let i = 0; i < fftData.length; i++) {
-            if (earthquakeActive) {
-                const freq = [0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 100][i];
-                fftData[i] = earthquakeMagnitude * 10 * Math.exp(-Math.pow((freq - 5) / 5, 2)) + Math.random() * 2;
-            } else {
-                fftData[i] = Math.random() * 2;
-            }
-        }
-        fftChart.update('none');
+                // JIKA GEMPA TERJADI SAAT DI TAB GRAFIK -> IKUT BERSIAP MENAMBAH ANGKA DI DASHBOARD
+                const statusStr = String(e.status || '').toUpperCase();
+                if (statusStr === 'EARTHQUAKE' || statusStr === 'GEMPA' || statusStr === 'P-WAVE' || statusStr === 'S-WAVE') {
+                    let currentCount = parseInt(localStorage.getItem('eews_today_event_count')) || 0;
+                    localStorage.setItem('eews_today_event_count', currentCount + 1);
+                }
+            });
     }
-
-    setInterval(updateData, 100);
+});
 </script>
 @endpush
-@endsection

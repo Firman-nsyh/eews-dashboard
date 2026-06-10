@@ -1,234 +1,424 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Earthquake Detection System') | SeismoGuard</title>
-    
-    {{-- Tailwind CSS --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    {{-- Font Awesome --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    {{-- Chart.js --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    {{-- Leaflet Map --}}
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>SeismoGuard — @yield('title', 'Dashboard')</title>
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'seismo-dark': '#0f172a',
-                        'seismo-card': '#1e293b',
-                        'seismo-accent': '#06b6d4',
-                        'danger': '#ef4444',
-                        'warning': '#f59e0b',
-                        'watch': '#f97316',
-                        'safe': '#10b981'
-                    },
-                    animation: {
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'shake': 'shake 0.5s ease-in-out',
-                        'wave': 'wave 2s ease-in-out infinite'
-                    },
-                    keyframes: {
-                        shake: {
-                            '0%, 100%': { transform: 'translateX(0)' },
-                            '25%': { transform: 'translateX(-5px)' },
-                            '75%': { transform: 'translateX(5px)' }
-                        },
-                        wave: {
-                            '0%': { transform: 'scaleY(1)' },
-                            '50%': { transform: 'scaleY(1.5)' },
-                            '100%': { transform: 'scaleY(1)' }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    @vite(['resources/js/app.js'])
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             font-family: 'Inter', sans-serif;
-            background: #0f172a;
+            background: #0a0f1e;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            padding: 0 1.5rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .navbar-brand .logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: white;
+        }
+
+        .navbar-brand .brand-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .navbar-brand .brand-sub {
+            font-size: 0.65rem;
+            color: #64748b;
+            margin-top: -2px;
+        }
+
+        .navbar-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            list-style: none;
+        }
+
+        .navbar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.875rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #94a3b8;
+            transition: all 0.2s;
+        }
+
+        .navbar-nav a:hover {
+            background: rgba(148, 163, 184, 0.1);
             color: #e2e8f0;
         }
-        
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        
+
+        .navbar-nav a.active {
+            background: rgba(6, 182, 212, 0.15);
+            color: #06b6d4;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: #10b981;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .clock {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-align: right;
+        }
+
+        /* Main content */
+        .main-content {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Glass panel */
         .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
         }
-        
-        .seismograph-grid {
-            background-image: 
-                linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
-            background-size: 20px 20px;
+
+        /* Cards grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
-        
-        .alert-banner {
-            background: linear-gradient(90deg, #dc2626 0%, #991b1b 100%);
-            box-shadow: 0 0 20px rgba(220, 38, 38, 0.5);
+
+        .stat-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 12px;
+            padding: 1.25rem;
+            position: relative;
+            overflow: hidden;
         }
-        
-        .node-status-dot {
-            box-shadow: 0 0 8px currentColor;
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
         }
-        
-        .wave-bar {
-            display: inline-block;
-            width: 3px;
-            background: #06b6d4;
-            margin: 0 1px;
-            border-radius: 2px;
-            animation: wave 1.2s ease-in-out infinite;
+
+        .stat-card.cyan::before  { background: #06b6d4; }
+        .stat-card.green::before { background: #10b981; }
+        .stat-card.blue::before  { background: #3b82f6; }
+        .stat-card.purple::before{ background: #8b5cf6; }
+
+        .stat-label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: white; }
+        .stat-sub   { font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem; }
+        .stat-icon  {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2.5rem;
+            opacity: 0.08;
         }
-        
-        .wave-bar:nth-child(2) { animation-delay: 0.1s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(5) { animation-delay: 0.4s; }
-        
+
+        /* Status colors */
+        .text-cyan   { color: #06b6d4; }
+        .text-green  { color: #10b981; }
+        .text-yellow { color: #f59e0b; }
+        .text-red    { color: #ef4444; }
+        .text-blue   { color: #3b82f6; }
+        .text-slate  { color: #94a3b8; }
+
+        /* Seismograph */
+        .seismograph-container {
+            position: relative;
+            height: 350px;
+            background: #060b18;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.08);
+            overflow: hidden;
+        }
+
+        .seismograph-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* STA/LTA bar */
+        .stalta-bar-container {
+            margin-top: 1rem;
+        }
+
+        .stalta-bar-track {
+            height: 14px;
+            background: #1e293b;
+            border-radius: 99px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stalta-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+            border-radius: 99px;
+            transition: width 0.3s ease;
+        }
+
+        .stalta-threshold-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: rgba(255,255,255,0.5);
+            left: 66.6%;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .data-table th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+            color: #cbd5e1;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(148, 163, 184, 0.04);
+        }
+
+        /* Status badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.6rem;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .badge-gempa   { background: rgba(239,68,68,0.15);  color: #ef4444; }
+        .badge-siaga   { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .badge-waspada { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .badge-aman    { background: rgba(16,185,129,0.15); color: #10b981; }
+
+        /* Alert cards */
+        .alert-level-card {
+            border-radius: 10px;
+            padding: 1.25rem;
+            border: 1px solid;
+        }
+
+        .alert-level-card.danger  { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.3); }
+        .alert-level-card.warning { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); }
+        .alert-level-card.watch   { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.3); }
+        .alert-level-card.safe    { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.3); }
+
         /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+
+        /* Utility */
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mt-4 { margin-top: 1rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .rounded { border-radius: 8px; }
+        .rounded-lg { border-radius: 12px; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .text-white { color: white; }
+        .w-full { width: 100%; }
+        .overflow-auto { overflow: auto; }
+        .space-y > * + * { margin-top: 1rem; }
     </style>
-    
-    @stack('styles')
 </head>
-<body class="min-h-screen bg-seismo-dark">
-    {{-- Alert Banner --}}
-    <div id="emergency-alert" class="hidden alert-banner text-white px-4 py-3 text-center font-bold animate-shake">
-        <i class="fa-solid fa-triangle-exclamation mr-2"></i>
-        <span id="alert-message">DETEKSI GEMPA BAHAYA! Segera evakuasi ke tempat aman!</span>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <a href="{{ route('dashboard') }}" class="navbar-brand">
+        <div class="logo"><i class="fa-solid fa-house-crack"></i></div>
+        <div>
+            <div class="brand-name">SeismoGuard</div>
+            <div class="brand-sub">Earthquake Early Warning System</div>
+        </div>
+    </a>
+
+    <ul class="navbar-nav">
+        <li>
+            <a href="{{ route('dashboard') }}"
+               class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('seismograph') }}"
+               class="{{ request()->routeIs('seismograph') ? 'active' : '' }}">
+                <i class="fa-solid fa-wave-square"></i> Seismograf
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('logdata') }}"
+               class="{{ request()->routeIs('logdata') ? 'active' : '' }}">
+                <i class="fa-solid fa-clock-rotate-left"></i> Log Data
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('alerts') }}"
+               class="{{ request()->routeIs('alerts') ? 'active' : '' }}">
+                <i class="fa-solid fa-bell"></i> Alert
+            </a>
+        </li>
+        <li>
+            <a href="{{ url('/control') }}"
+               class="{{ request()->is('control') ? 'active' : '' }}">
+                <i class="fa-solid fa-sliders"></i> Panel Kontrol
+            </a>
+        </li>
+        </ul>
+
+    <div class="navbar-right">
+        <div class="status-badge">
+            <div class="status-dot"></div>
+            <span>System Online</span>
+        </div>
+        <div class="clock">
+            <div id="clock-time" class="font-mono" style="font-size:1rem;color:white;font-weight:600;"></div>
+            <div id="clock-date" style="font-size:0.65rem;color:#64748b;text-align:right;"></div>
+        </div>
     </div>
+</nav>
 
-    {{-- Navigation --}}
-    <nav class="glass-panel sticky top-0 z-50 border-b border-slate-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 flex items-center gap-3">
-                        <div class="w-10 h-10 bg-seismo-accent rounded-lg flex items-center justify-center">
-                            <i class="fa-solid fa-house-crack text-white text-xl"></i>
-                        </div>
-                        <div>
-                            <h1 class="text-xl font-bold text-white tracking-tight">SeismoGuard</h1>
-                            <p class="text-xs text-slate-400">Earthquake Early Warning System</p>
-                        </div>
-                    </div>
-                    
-                    <div class="hidden md:ml-8 md:flex md:space-x-1">
-                        <a href="{{ route('dashboard') }}" class="px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('dashboard') ? 'bg-seismo-accent/20 text-seismo-accent' : 'text-slate-300 hover:text-white hover:bg-slate-800' }} transition-all">
-                            <i class="fa-solid fa-gauge-high mr-1"></i> Dashboard
-                        </a>
-                        <a href="{{ route('seismograph') }}" class="px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('seismograph') ? 'bg-seismo-accent/20 text-seismo-accent' : 'text-slate-300 hover:text-white hover:bg-slate-800' }} transition-all">
-                            <i class="fa-solid fa-wave-square mr-1"></i> Seismograf
-                        </a>
-                        <a href="{{ route('nodes.index') }}" class="px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('nodes.*') ? 'bg-seismo-accent/20 text-seismo-accent' : 'text-slate-300 hover:text-white hover:bg-slate-800' }} transition-all">
-                            <i class="fa-solid fa-microchip mr-1"></i> Node Sensor
-                        </a>
-                        <a href="{{ route('logs.index') }}" class="px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('logs.*') ? 'bg-seismo-accent/20 text-seismo-accent' : 'text-slate-300 hover:text-white hover:bg-slate-800' }} transition-all">
-                            <i class="fa-solid fa-clock-rotate-left mr-1"></i> Log Data
-                        </a>
-                        <a href="{{ route('alerts') }}" class="px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('alerts') ? 'bg-seismo-accent/20 text-seismo-accent' : 'text-slate-300 hover:text-white hover:bg-slate-800' }} transition-all relative">
-                            <i class="fa-solid fa-bell mr-1"></i> Alert
-                            <span id="alert-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-danger rounded-full text-[10px] flex items-center justify-center">!</span>
-                        </a>
-                    </div>
-                </div>
-                
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2 text-sm text-slate-400">
-                        <span class="w-2 h-2 bg-safe rounded-full node-status-dot animate-pulse"></span>
-                        <span class="hidden sm:inline">System Online</span>
-                    </div>
-                    <div class="text-right hidden sm:block">
-                        <div class="text-sm font-mono text-seismo-accent" id="live-clock">00:00:00</div>
-                        <div class="text-xs text-slate-500" id="live-date">Loading...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+<!-- Content -->
+<main class="main-content">
+    @yield('content')
+</main>
 
-    {{-- Main Content --}}
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        @yield('content')
-    </main>
+<script>
+    // Clock
+    function updateClock() {
+        const now  = new Date();
+        const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        document.getElementById('clock-time').textContent =
+            now.toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        document.getElementById('clock-date').textContent =
+            days[now.getDay()] + ', ' + now.toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'});
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
 
-    {{-- Footer --}}
-    <footer class="border-t border-slate-800 mt-12 py-6">
-        <div class="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-            <p>SeismoGuard &copy; 2024 - Sistem Pendeteksi Gempa Berbasis IoT | ESP32 + MPU6050 + HC-SR04</p>
-            <p class="mt-1 text-xs">Proyek Akhir Semester - Jalur: MQTT → Node-RED → InfluxDB → Laravel</p>
-        </div>
-    </footer>
-
-    <script>
-        // Live Clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('live-clock').textContent = now.toLocaleTimeString('id-ID', {hour12: false});
-            document.getElementById('live-date').textContent = now.toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // Real-time data fetcher
-        async function fetchLatestTelemetry() {
-            try {
-                const response = await fetch('/api/telemetry/latest');
-                const data = await response.json();
-                
-                if (Array.isArray(data) && data.length > 0) {
-                    const latest = data[0];
-                    if (latest.alert_level === 'danger') {
-                        showEmergencyAlert(latest);
-                    }
-                }
-            } catch (e) {
-                console.error('Fetch error:', e);
-            }
-        }
-
-        function showEmergencyAlert(data) {
-            const banner = document.getElementById('emergency-alert');
-            const msg = document.getElementById('alert-message');
-            msg.textContent = `GEMPA TERDETEKSI! Magnitudo: ${data.magnitude} | Node: ${data.node_id} | ${new Date(data.recorded_at).toLocaleTimeString('id-ID')}`;
-            banner.classList.remove('hidden');
-            
-            // Play alert sound if browser allows
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8LdnGgU1k9n1unEiBC13yO/eizEIHWq+8+OZ');
-            audio.play().catch(() => {});
-        }
-
-        // Poll every 3 seconds
-        setInterval(fetchLatestTelemetry, 3000);
-
-        // Auto-hide emergency alert after 30 seconds
-        setInterval(() => {
-            const banner = document.getElementById('emergency-alert');
-            if (!banner.classList.contains('hidden')) {
-                banner.classList.add('hidden');
-            }
-        }, 30000);
-    </script>
-
-    @stack('scripts')
+@stack('scripts')
 </body>
 </html>

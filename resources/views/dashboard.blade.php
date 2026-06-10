@@ -1,424 +1,259 @@
 @extends('layouts.app')
-
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="space-y-6">
-    {{-- Stats Cards --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-seismo-accent/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
-            <div class="relative">
-                <p class="text-slate-400 text-sm font-medium">Total Node Sensor</p>
-                <div class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-white">{{ $stats['total_nodes'] }}</span>
-                    <span class="text-xs text-seismo-accent">ESP32 + MPU6050</span>
-                </div>
-                <div class="mt-4 flex items-center gap-2 text-sm">
-                    <span class="w-2 h-2 bg-safe rounded-full"></span>
-                    <span class="text-slate-400">{{ $stats['online_nodes'] }} Online</span>
-                </div>
+<div class="stats-grid">
+    <div class="stat-card cyan">
+        <i class="fa-solid fa-network-wired stat-icon"></i>
+        <div class="stat-label">Total Node Sensor</div>
+        <div class="stat-value text-cyan">1</div>
+        <div class="stat-sub"><i class="fa-solid fa-microchip"></i> ESP32-CAM + MPU6050</div>
+    </div>
+
+    <div class="stat-card red">
+        <i class="fa-solid fa-house-crack stat-icon"></i>
+        <div class="stat-label">Event Gempa Hari Ini</div>
+        <div class="stat-value text-red" id="today-events">0</div>
+        <div class="stat-sub">Deteksi terkonfirmasi</div>
+    </div>
+
+    <div class="stat-card green">
+        <i class="fa-solid fa-shield-halved stat-icon"></i>
+        <div class="stat-label">Status Sistem</div>
+        <div class="stat-value text-green" style="font-size: 1.2rem; margin-top:0.5rem;">
+            <div class="badge badge-aman" id="system-status">
+                <i class="fa-solid fa-check-circle"></i> MONITORING AKTIF
             </div>
-            <i class="fa-solid fa-network-wired absolute bottom-4 right-4 text-4xl text-slate-700"></i>
+        </div>
+        <div class="stat-sub mt-2">Algoritma STA/LTA Ready</div>
+    </div>
+
+    <div class="stat-card blue">
+        <i class="fa-solid fa-cloud stat-icon"></i>
+        <div class="stat-label">Konektivitas</div>
+        <div class="stat-value text-blue">MQTT</div>
+        <div class="stat-sub">ESP-NOW &rarr; WiFi &rarr; Mosquitto</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-panel p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg">
+                <i class="fa-solid fa-wave-square text-cyan"></i> Sinyal Terakhir
+            </h3>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate font-mono" id="last-update-time">-</span>
+                <span class="badge badge-aman" id="live-indicator">
+                    <span id="ws-dot" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;margin-right:4px;"></span>
+                    LIVE
+                </span>
+            </div>
         </div>
 
-        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-warning/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
-            <div class="relative">
-                <p class="text-slate-400 text-sm font-medium">Event Gempa Hari Ini</p>
-                <div class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-white">{{ $stats['today_events'] }}</span>
-                    <span class="text-xs text-warning">deteksi</span>
-                </div>
-                <div class="mt-4 text-sm text-slate-400">
-                    @if($stats['last_earthquake'])
-                        Terakhir: {{ $stats['last_earthquake']->recorded_at->diffForHumans() }}
-                    @else
-                        Belum ada event
-                    @endif
+        <div class="grid-2 mt-4">
+            <div>
+                <div class="text-xs text-slate mb-1">Rasio STA/LTA (Ambang: 2.0)</div>
+                <div class="text-2xl font-mono font-bold text-white" id="dash-stalta">0.000</div>
+                <div class="stalta-bar-container mt-2">
+                    <div class="stalta-bar-track">
+                        <div class="stalta-bar-fill" id="dash-stalta-bar" style="width:0%"></div>
+                        <div class="stalta-threshold-line"></div>
+                    </div>
                 </div>
             </div>
-            <i class="fa-solid fa-house-crack absolute bottom-4 right-4 text-4xl text-slate-700"></i>
+            <div>
+                <div class="text-xs text-slate mb-1">Deviasi Getaran</div>
+                <div class="text-2xl font-mono font-bold text-white">
+                    <span id="dash-dev-val">0.000</span>
+                    <span class="text-sm text-slate">g</span>
+                </div>
+                <div class="text-xs text-slate mt-2">
+                    STA: <span class="font-mono text-cyan" id="dash-sta">0.000000</span> |
+                    LTA: <span class="font-mono text-green" id="dash-lta">0.000000</span>
+                </div>
+            </div>
         </div>
 
-        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-danger/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
-            <div class="relative">
-                <p class="text-slate-400 text-sm font-medium">Status Sistem</p>
-                <div class="mt-2">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-safe/20 text-safe">
-                        <span class="w-2 h-2 bg-safe rounded-full mr-2 animate-pulse"></span>
-                        Monitoring Aktif
-                    </span>
-                </div>
-                <div class="mt-4 text-sm text-slate-400">
-                    STA/LTA & TinyML Ready
-                </div>
-            </div>
-            <i class="fa-solid fa-shield-halved absolute bottom-4 right-4 text-4xl text-slate-700"></i>
-        </div>
-
-        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
-            <div class="relative">
-                <p class="text-slate-400 text-sm font-medium">Konektivitas</p>
-                <div class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-white">MQTT</span>
-                </div>
-                <div class="mt-4 text-sm text-slate-400">
-                    Mosquitto Broker • Node-RED • WebSocket
-                </div>
-            </div>
-            <i class="fa-solid fa-cloud absolute bottom-4 right-4 text-4xl text-slate-700"></i>
+        <div class="mt-4" style="padding-top:1rem;border-top:1px solid rgba(148,163,184,0.1)">
+            <div class="text-xs text-slate mb-1">Sensor ID</div>
+            <div class="font-mono text-sm text-white" id="dash-sensor-id">-</div>
         </div>
     </div>
 
-    {{-- Main Grid --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {{-- Real-time Seismograph Preview --}}
-        <div class="lg:col-span-2 glass-panel rounded-xl p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-wave-square text-seismo-accent"></i>
-                    Real-Time Seismograf
-                </h2>
-                <div class="flex items-center gap-2">
-                    <span class="flex h-3 w-3">
-                        <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-danger opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-danger"></span>
-                    </span>
-                    <span class="text-xs text-danger font-mono">LIVE</span>
-                </div>
-            </div>
-            
-            <div class="relative h-64 seismograph-grid rounded-lg border border-slate-700 overflow-hidden">
-                <canvas id="seismo-preview" class="w-full h-full"></canvas>
-                <div class="absolute top-2 right-2 flex gap-1">
-                    <div class="wave-bar h-4"></div>
-                    <div class="wave-bar h-6"></div>
-                    <div class="wave-bar h-3"></div>
-                    <div class="wave-bar h-8"></div>
-                    <div class="wave-bar h-5"></div>
-                </div>
-            </div>
-            
-            <div class="mt-4 grid grid-cols-3 gap-4 text-center">
-                <div class="bg-slate-800/50 rounded-lg p-3">
-                    <p class="text-xs text-slate-400">Accel X</p>
-                    <p class="text-lg font-mono font-bold text-seismo-accent" id="val-accel-x">0.00</p>
-                </div>
-                <div class="bg-slate-800/50 rounded-lg p-3">
-                    <p class="text-xs text-slate-400">Accel Y</p>
-                    <p class="text-lg font-mono font-bold text-seismo-accent" id="val-accel-y">0.00</p>
-                </div>
-                <div class="bg-slate-800/50 rounded-lg p-3">
-                    <p class="text-xs text-slate-400">Accel Z</p>
-                    <p class="text-lg font-mono font-bold text-seismo-accent" id="val-accel-z">0.00</p>
-                </div>
-            </div>
-        </div>
-
-        {{-- Active Alerts Feed --}}
-        <div class="glass-panel rounded-xl p-6">
-            <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-bell text-warning"></i>
-                Alert Aktif
-            </h2>
-            
-            <div class="space-y-3 max-h-80 overflow-y-auto pr-2" id="alerts-feed">
-                @forelse($recentAlerts as $alert)
-                <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-{{ $alert->alert_color }}-500">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{{ $alert->alert_color }}-500/20 text-{{ $alert->alert_color }}-400">
-                                {{ strtoupper($alert->alert_level) }}
-                            </span>
-                            <p class="mt-1 text-sm font-medium text-white">{{ $alert->sensorNode->name ?? $alert->node_id }}</p>
-                            <p class="text-xs text-slate-400 mt-1">
-                                Mag: {{ $alert->magnitude }} | STA/LTA: {{ number_format($alert->sta_lta_ratio, 2) }}
-                            </p>
-                        </div>
-                        <span class="text-xs text-slate-500">{{ $alert->recorded_at->diffForHumans() }}</span>
-                    </div>
-                </div>
-                @empty
-                <div class="text-center py-8 text-slate-500">
-                    <i class="fa-solid fa-check-circle text-4xl mb-2 text-safe"></i>
-                    <p>Tidak ada alert aktif</p>
-                    <p class="text-xs mt-1">Semua sensor dalam kondisi aman</p>
-                </div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-
-    {{-- Node Status Grid --}}
-    <div class="glass-panel rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-microchip text-seismo-accent"></i>
-            Status Node Sensor
-        </h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            @foreach($nodes as $node)
-            <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700 hover:border-seismo-accent/50 transition-colors">
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
-                            <i class="fa-solid fa-wifi {{ $node->isOnline() ? 'text-safe' : 'text-slate-500' }}"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-medium text-white">{{ $node->name }}</h3>
-                            <p class="text-xs text-slate-400">{{ $node->location }}</p>
-                        </div>
-                    </div>
-                    <span class="w-2.5 h-2.5 rounded-full {{ $node->isOnline() ? 'bg-safe node-status-dot' : 'bg-slate-600' }}"></span>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="bg-slate-900/50 rounded p-2">
-                        <p class="text-slate-500">MPU6050</p>
-                        <p class="text-safe font-mono">{{ $node->mpu6050_status ? 'OK' : 'ERR' }}</p>
-                    </div>
-                    <div class="bg-slate-900/50 rounded p-2">
-                        <p class="text-slate-500">HC-SR04</p>
-                        <p class="text-safe font-mono">{{ $node->hc_sr04_status ? 'OK' : 'ERR' }}</p>
-                    </div>
-                    <div class="bg-slate-900/50 rounded p-2">
-                        <p class="text-slate-500">ESP-NOW</p>
-                        <p class="text-seismo-accent font-mono">{{ $node->esp_now_signal ?? 'N/A' }} dBm</p>
-                    </div>
-                    <div class="bg-slate-900/50 rounded p-2">
-                        <p class="text-slate-500">Baterai</p>
-                        <p class="text-warning font-mono">{{ $node->battery_level ?? 'N/A' }}%</p>
-                    </div>
-                </div>
-                
-                @if($node->telemetries->first())
-                @php $last = $node->telemetries->first(); @endphp
-                <div class="mt-3 pt-3 border-t border-slate-700">
-                    <div class="flex justify-between text-xs">
-                        <span class="text-slate-500">Last reading:</span>
-                        <span class="text-slate-300 font-mono">{{ $last->recorded_at->diffForHumans() }}</span>
-                    </div>
-                    <div class="mt-1 flex gap-2">
-                        <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">
-                            X: {{ number_format($last->accel_x, 2) }}
-                        </span>
-                        <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">
-                            Y: {{ number_format($last->accel_y, 2) }}
-                        </span>
-                        <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">
-                            Z: {{ number_format($last->accel_z, 2) }}
-                        </span>
-                    </div>
-                </div>
-                @endif
-            </div>
-            @endforeach
-        </div>
-    </div>
-
-    {{-- System Architecture Diagram --}}
-    <div class="glass-panel rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-diagram-project text-seismo-accent"></i>
-            Arsitektur Sistem
-        </h2>
-        
-        <div class="flex flex-wrap justify-center items-center gap-4 text-sm">
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-slate-600 w-40">
-                <i class="fa-solid fa-microchip text-2xl text-seismo-accent mb-2"></i>
-                <p class="font-medium text-white">Node Sensor</p>
-                <p class="text-xs text-slate-400 mt-1">ESP32 + MPU6050 + HC-SR04</p>
-                <p class="text-[10px] text-seismo-accent mt-1">STA/LTA + TinyML</p>
-            </div>
-            
-            <i class="fa-solid fa-arrow-right text-slate-600"></i>
-            
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-slate-600 w-40">
-                <i class="fa-solid fa-tower-broadcast text-2xl text-warning mb-2"></i>
-                <p class="font-medium text-white">Node Gateway</p>
-                <p class="text-xs text-slate-400 mt-1">ESP-NOW + WiFi</p>
-                <p class="text-[10px] text-warning mt-1">JSON Payload</p>
-            </div>
-            
-            <i class="fa-solid fa-arrow-right text-slate-600"></i>
-            
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-slate-600 w-40">
-                <i class="fa-solid fa-cloud text-2xl text-purple-400 mb-2"></i>
-                <p class="font-medium text-white">MQTT Broker</p>
-                <p class="text-xs text-slate-400 mt-1">Mosquitto</p>
-                <p class="text-[10px] text-purple-400 mt-1">sensor/telemetri</p>
-            </div>
-            
-            <i class="fa-solid fa-arrow-right text-slate-600"></i>
-            
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-slate-600 w-40">
-                <i class="fa-solid fa-server text-2xl text-blue-400 mb-2"></i>
-                <p class="font-medium text-white">Node-RED</p>
-                <p class="text-xs text-slate-400 mt-1">Middleware + WebSocket</p>
-                <p class="text-[10px] text-blue-400 mt-1">ws-gempa</p>
-            </div>
-            
-            <i class="fa-solid fa-arrow-right text-slate-600"></i>
-            
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-seismo-accent w-40 ring-2 ring-seismo-accent/20">
-                <i class="fa-brands fa-laravel text-2xl text-danger mb-2"></i>
-                <p class="font-medium text-white">Laravel App</p>
-                <p class="text-xs text-slate-400 mt-1">Web UI + API</p>
-                <p class="text-[10px] text-danger mt-1">Real-time Monitor</p>
-            </div>
-            
-            <i class="fa-solid fa-arrow-right text-slate-600"></i>
-            
-            <div class="bg-slate-800 rounded-lg p-4 text-center border border-slate-600 w-40">
-                <i class="fa-solid fa-database text-2xl text-green-400 mb-2"></i>
-                <p class="font-medium text-white">InfluxDB</p>
-                <p class="text-xs text-slate-400 mt-1">Time-Series DB</p>
-                <p class="text-[10px] text-green-400 mt-1">History Log</p>
-            </div>
+    <div class="glass-panel p-6" style="position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; min-height:200px;">
+        <h3 class="font-semibold text-lg w-full text-left" style="position:absolute;top:1.5rem;left:1.5rem;">
+            <i class="fa-solid fa-bell text-yellow"></i> Alert Aktif
+        </h3>
+        <div id="alert-display">
+            <i class="fa-solid fa-circle-check text-green mb-2" style="font-size:3rem;"></i>
+            <div class="text-lg font-semibold text-white">Tidak ada alert aktif</div>
+            <div class="text-sm text-slate">Semua sensor dalam kondisi aman</div>
         </div>
     </div>
 </div>
 
+<div class="glass-panel p-6 mt-4">
+    <h3 class="font-semibold text-lg mb-4">
+        <i class="fa-solid fa-diagram-project text-cyan"></i> Arsitektur Sistem
+    </h3>
+    <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;flex-wrap:wrap;">
+        @php
+        $nodes = [
+            ['icon'=>'fa-microchip',      'label'=>'Node Sensor',   'sub'=>'ESP32-CAM + MPU6050',    'color'=>'#06b6d4'],
+            ['icon'=>'fa-tower-broadcast', 'label'=>'Node Gateway',  'sub'=>'ESP-NOW + WiFi',         'color'=>'#8b5cf6'],
+            ['icon'=>'fa-cloud',           'label'=>'MQTT Broker',   'sub'=>'Mosquitto VM1',          'color'=>'#ec4899'],
+            ['icon'=>'fa-circle-nodes',    'label'=>'Node-RED',      'sub'=>'Middleware VM2',         'color'=>'#f59e0b'],
+            ['icon'=>'fa-brands fa-laravel','label'=>'Laravel App',  'sub'=>'Web UI + API',           'color'=>'#ef4444'],
+            ['icon'=>'fa-database',        'label'=>'InfluxDB',      'sub'=>'Time-Series DB VM3',     'color'=>'#10b981'],
+        ];
+        @endphp
+
+        @foreach($nodes as $i => $node)
+            <div style="text-align:center;padding:1rem;background:rgba(15,23,42,0.8);border:1px solid rgba(148,163,184,0.12);border-radius:10px;min-width:110px;">
+                <i class="fa-solid {{ $node['icon'] }}" style="font-size:1.5rem;color:{{ $node['color'] }};margin-bottom:0.5rem;display:block;"></i>
+                <div style="font-size:0.75rem;font-weight:600;color:white;">{{ $node['label'] }}</div>
+                <div style="font-size:0.65rem;color:#64748b;margin-top:0.2rem;">{{ $node['sub'] }}</div>
+            </div>
+            @if(!$loop->last)
+                <i class="fa-solid fa-arrow-right" style="color:#334155;font-size:0.875rem;"></i>
+            @endif
+        @endforeach
+    </div>
+</div>
+@endsection
+
 @push('scripts')
 <script>
-    // Real-time seismograph chart
-    const ctx = document.getElementById('seismo-preview').getContext('2d');
-    const maxDataPoints = 100;
-    const dataPoints = {
-        x: Array(maxDataPoints).fill(0),
-        y: Array(maxDataPoints).fill(0),
-        z: Array(maxDataPoints).fill(0)
-    };
+function updateDashboard(e) {
+    const ratio = parseFloat(e.stalta_ratio) || 0;
+    const dev   = parseFloat(e.deviation)    || 0;
+    const sta   = parseFloat(e.sta_value)    || 0;
+    const lta   = parseFloat(e.lta_value)    || 0;
 
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: Array(maxDataPoints).fill(''),
-            datasets: [
-                {
-                    label: 'Accel X',
-                    data: dataPoints.x,
-                    borderColor: '#06b6d4',
-                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    fill: true
-                },
-                {
-                    label: 'Accel Y',
-                    data: dataPoints.y,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    fill: true
-                },
-                {
-                    label: 'Accel Z',
-                    data: dataPoints.z,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    fill: true
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    labels: { color: '#94a3b8', font: { size: 10 } }
-                }
-            },
-            scales: {
-                x: {
-                    display: false
-                },
-                y: {
-                    grid: {
-                        color: 'rgba(148, 163, 184, 0.1)'
-                    },
-                    ticks: {
-                        color: '#64748b',
-                        font: { size: 10 }
-                    }
-                }
-            }
-        }
-    });
+    document.getElementById('dash-stalta').innerText  = ratio.toFixed(3);
+    document.getElementById('dash-dev-val').innerText = dev.toFixed(4);
+    document.getElementById('dash-sta').innerText     = sta.toFixed(6);
+    document.getElementById('dash-lta').innerText     = lta.toFixed(6);
+    document.getElementById('dash-sensor-id').innerText = e.sensor_id || '-';
+    
+    let dateObj = e.time ? new Date(e.time) : (e.timestamp ? new Date(e.timestamp) : new Date());
+    document.getElementById('last-update-time').innerText = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Simulate real-time data (replace with actual WebSocket/MQTT connection)
-    async function updateSeismograph() {
-        try {
-            const response = await fetch('/api/telemetry/latest?limit=1');
-            const data = await response.json();
-            
-            if (Array.isArray(data) && data.length > 0) {
-                const latest = data[0];
-                
-                // Update values
-                document.getElementById('val-accel-x').textContent = latest.accel_x?.toFixed(2) || '0.00';
-                document.getElementById('val-accel-y').textContent = latest.accel_y?.toFixed(2) || '0.00';
-                document.getElementById('val-accel-z').textContent = latest.accel_z?.toFixed(2) || '0.00';
+    const pct = Math.min((ratio / 3.0) * 100, 100);
+    document.getElementById('dash-stalta-bar').style.width = pct + '%';
+    document.getElementById('dash-stalta-bar').style.background = ratio >= 2.0 ? '#ef4444' : (ratio >= 1.5 ? '#f59e0b' : 'linear-gradient(90deg, #10b981, #f59e0b)');
 
-                // Shift and push new data
-                dataPoints.x.shift();
-                dataPoints.x.push(latest.accel_x || 0);
-                dataPoints.y.shift();
-                dataPoints.y.push(latest.accel_y || 0);
-                dataPoints.z.shift();
-                dataPoints.z.push(latest.accel_z || 0);
+    const alertDisplay = document.getElementById('alert-display');
+    const sysStatus    = document.getElementById('system-status');
+    const status       = String(e.status || '').toUpperCase();
 
-                chart.update('none');
-            } else {
-                // Demo mode - generate synthetic wave
-                const t = Date.now() / 1000;
-                const noise = () => (Math.random() - 0.5) * 0.1;
-                
-                dataPoints.x.shift();
-                dataPoints.x.push(Math.sin(t * 2) * 0.5 + noise());
-                dataPoints.y.shift();
-                dataPoints.y.push(Math.cos(t * 1.5) * 0.3 + noise());
-                dataPoints.z.shift();
-                dataPoints.z.push(9.8 + Math.sin(t * 0.5) * 0.2 + noise());
+    if (status === 'GEMPA' || status === 'EARTHQUAKE' || status === 'P-WAVE' || status === 'S-WAVE' || ratio >= 2.0) {
+        alertDisplay.innerHTML = `
+            <i class="fa-solid fa-triangle-exclamation text-red mb-2" style="font-size:3rem;animation:pulse 1s infinite;"></i>
+            <div class="text-lg font-semibold text-red">BAHAYA: GEMPA TERDETEKSI!</div>
+            <div class="text-sm text-slate">STATUS: ${status} | STA/LTA: ${ratio.toFixed(3)}</div>
+        `;
+        sysStatus.className   = 'badge badge-gempa';
+        sysStatus.innerHTML   = '<i class="fa-solid fa-xmark-circle"></i> SISTEM TERPICU';
+    } else if (status === 'SIAGA' || status === 'EVALUASI' || ratio >= 1.5) {
+        alertDisplay.innerHTML = `
+            <i class="fa-solid fa-triangle-exclamation text-yellow mb-2" style="font-size:3rem;"></i>
+            <div class="text-lg font-semibold text-yellow">SIAGA: Menganalisis Getaran</div>
+            <div class="text-sm text-slate">STA/LTA: ${ratio.toFixed(3)}</div>
+        `;
+        sysStatus.className = 'badge badge-siaga';
+        sysStatus.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> SIAGA';
+    } else {
+        alertDisplay.innerHTML = `
+            <i class="fa-solid fa-circle-check text-green mb-2" style="font-size:3rem;"></i>
+            <div class="text-lg font-semibold text-white">Tidak ada alert aktif</div>
+            <div class="text-sm text-slate">Semua sensor dalam kondisi aman</div>
+        `;
+        sysStatus.className = 'badge badge-aman';
+        sysStatus.innerHTML = '<i class="fa-solid fa-check-circle"></i> MONITORING AKTIF';
+    }
+}
 
-                chart.update('none');
-            }
-        } catch (e) {
-            // Demo mode fallback
-            const t = Date.now() / 1000;
-            const noise = () => (Math.random() - 0.5) * 0.1;
-            
-            dataPoints.x.shift();
-            dataPoints.x.push(Math.sin(t * 2) * 0.5 + noise());
-            dataPoints.y.shift();
-            dataPoints.y.push(Math.cos(t * 1.5) * 0.3 + noise());
-            dataPoints.z.shift();
-            dataPoints.z.push(9.8 + Math.sin(t * 0.5) * 0.2 + noise());
+document.addEventListener('DOMContentLoaded', async function () {
 
-            document.getElementById('val-accel-x').textContent = dataPoints.x[maxDataPoints-1].toFixed(2);
-            document.getElementById('val-accel-y').textContent = dataPoints.y[maxDataPoints-1].toFixed(2);
-            document.getElementById('val-accel-z').textContent = dataPoints.z[maxDataPoints-1].toFixed(2);
+    // =======================================================
+    // 🌟 FITUR BARU: AUTO-RESET MEMORI SAAT BERGANTI HARI
+    // =======================================================
+    const todayDate = new Date().toLocaleDateString('id-ID'); // Contoh: "10/6/2026"
+    const savedDate = localStorage.getItem('eews_current_date');
 
-            chart.update('none');
-        }
+    if (savedDate !== todayDate) {
+        // Jika hari berganti, reset semua memori counter kembali ke 0
+        localStorage.setItem('eews_today_event_count', '0');
+        localStorage.setItem('eews_current_date', todayDate);
+        
+        // Reset juga memori statistik di tab Alert agar sinkron
+        localStorage.setItem('eews_alert_stats', JSON.stringify({ 
+            'P-WAVE':0, 'S-WAVE':0, 'EARTHQUAKE':0, 'GEMPA':0, 'EVALUASI':0 
+        }));
     }
 
-    setInterval(updateSeismograph, 100);
+    // Load Telemetri Terakhir
+    const savedTelemetry = localStorage.getItem('eews_last_telemetry');
+    if (savedTelemetry) {
+        try { updateDashboard(JSON.parse(savedTelemetry)); } catch(e) {}
+    }
+
+    // Load Counter Instan (Anti Reset 0)
+    let savedEventCount = localStorage.getItem('eews_today_event_count') || 0;
+    document.getElementById('today-events').innerText = savedEventCount;
+
+    // Fetch API Data Live
+    try {
+        const res  = await fetch('/api/telemetry/latest');
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+            updateDashboard(json.data[0]); 
+            localStorage.setItem('eews_last_telemetry', JSON.stringify(json.data[0]));
+        }
+    } catch (err) { console.warn(err); }
+
+    // Fetch API Counter
+    try {
+        const resStats  = await fetch('/api/alert/stats');
+        const jsonStats = await resStats.json();
+        if (jsonStats.success && jsonStats.data) {
+            const d = jsonStats.data;
+            const serverTotal = (d.EARTHQUAKE || 0) + (d.GEMPA || 0) + (d['P-WAVE'] || 0) + (d['S-WAVE'] || 0);
+            if (serverTotal > parseInt(savedEventCount)) {
+                document.getElementById('today-events').innerText = serverTotal;
+                localStorage.setItem('eews_today_event_count', serverTotal);
+            }
+        }
+    } catch (err) { console.warn(err); }
+
+    // WebSocket Listener
+    if (window.Echo) {
+        window.Echo.channel('seismic')
+            .listen('.data.received', (e) => {
+                localStorage.setItem('eews_last_telemetry', JSON.stringify(e));
+                updateDashboard(e);
+
+                // 🌟 PROTEKSI SINKRONISASI COUNTER 🌟
+                const statusStr = String(e.status || '').toUpperCase();
+                if (statusStr === 'EARTHQUAKE' || statusStr === 'GEMPA' || statusStr === 'P-WAVE' || statusStr === 'S-WAVE') {
+                    let currentCount = parseInt(localStorage.getItem('eews_today_event_count')) || 0;
+                    let newCount = currentCount + 1;
+                    document.getElementById('today-events').innerText = newCount;
+                    localStorage.setItem('eews_today_event_count', newCount);
+                }
+
+                // 🌟 PROTEKSI SINKRONISASI GRAFIK (Meskipun Tab Seismograf Sedang Ditutup) 🌟
+                let localChartData = JSON.parse(localStorage.getItem('eews_chart_data')) || [];
+                localChartData.push({
+                    deviation: parseFloat(e.deviation) || 0,
+                    stalta_ratio: parseFloat(e.stalta_ratio) || 0
+                });
+                if (localChartData.length > 50) localChartData.shift();
+                localStorage.setItem('eews_chart_data', JSON.stringify(localChartData));
+            });
+    }
+});
 </script>
 @endpush
-@endsection
